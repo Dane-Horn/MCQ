@@ -255,35 +255,74 @@ def getStudentNumber(stNumber):
     d2 = getNumber(digit2)
     d3 = getNumber(digit3)
     d4 = getNumber(digit4)
-    print(y1, y2, numberToLetter(l), d1, d2, d3, d4)
     return f'{outNumber(y1)}{outNumber(y2)}{numberToLetter(l)}{outNumber(d1)}{outNumber(d2)}{outNumber(d3)}{outNumber(d4)}'
 
 
-def getAnswersTwoColumn(mcq):
-    rows, cols = mcq.shape
-    column1 = mcq[:, int(cols / 6):int(cols / 2.5)]
-    column2 = mcq[:, int(cols / 1.58):int(cols / 1.17)]
-
-    cv2.imshow('column1', cv2.resize(column1, (400, 1000)))
-    cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
-
-    rows, cols = column1.shape
-    groups1 = [column1[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups2 = [column2[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups1.extend(groups2)
-    for i, group in enumerate(groups1):
+def getAnswers(groups):
+    ret = []
+    for i, group in enumerate(groups):
         rows, cols = group.shape
         group = group[int(rows / 6): int(rows / 1.1), :]
         rows, cols = group.shape
         questions = [group[int(20 + (rows * ((i - 1) / 5)))                           :int(rows * ((i) / 5)), :] for i in range(1, 6)]
         cv2.imshow(f'group', group)
-        for question in questions:
+        for j, question in enumerate(questions):
             rows, cols = question.shape
             cv2.imshow('question', question)
             answers = outList(
                 getNumber(question, horizontal=True, max=5, multiple=True))
+            ret.append(answers)
             print(answers)
-            cv2.waitKey(0)
+            # cv2.waitKey(0)
+    return ret
+
+
+def groupsTwoColumn(mcq):
+    rows, cols = mcq.shape
+    column1 = mcq[:, int(cols / 6):int(cols / 2.5)]
+    column2 = mcq[:, int(cols / 1.58):int(cols / 1.17)]
+
+    #cv2.imshow('column1', cv2.resize(column1, (400, 1000)))
+    #cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
+
+    rows, cols = column1.shape
+    groups1 = [column1[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1.extend(groups2)
+    return groups1
+
+
+def groupsThreeColumn(mcq):
+    rows, cols = mcq.shape
+    column1 = mcq[:, int(cols / 13):int(cols / 3.5)]
+    column2 = mcq[:, int(cols / 2.3):int(cols / 1.55)]
+    column3 = mcq[:, int(cols / 1.27):int(cols / 1)]
+    cv2.imshow('column1', cv2.resize(column1, (400, 1000)))
+    cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
+    cv2.imshow('column3', cv2.resize(column3, (400, 1000)))
+
+    rows, cols = column1.shape
+    groups1 = [column1[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups3 = [column3[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1.extend(groups2)
+    groups1.extend(groups3)
+    return groups1
+
+
+def threeColumnCheck(img):
+    rows, cols = img.shape
+    check = img[int(rows/2):int(rows/1.2), int(cols/3.15):int(cols/3)]
+    check = cv2.resize(check, (500, 1000))
+    _, check = cv2.threshold(
+        check, 127, 255, cv2.THRESH_BINARY)
+    check = cv2.bitwise_not(check)
+    rows, cols = check.shape
+    cv2.imshow('check', check)
+    nPixels = rows * cols
+    if cv2.countNonZero(check) > (nPixels * 0.1):
+        return True
+    return False
 
 
 for f in os.listdir('Sheets/2018'):
@@ -295,13 +334,18 @@ for f in os.listdir('Sheets/2018'):
     stNumber = removeTaskFromStudentNumber(stNumber)
     taskNumber = getTaskNumber(task)
     sNum = getStudentNumber(stNumber)
-    getAnswersTwoColumn(mcqs)
+    answers = None
+    if threeColumnCheck(cropped):
+        answers = getAnswers(groupsThreeColumn(mcqs))
+    else:
+        answers = getAnswers(groupsTwoColumn(mcqs))
     cropped = cv2.resize(cropped, (800, 1000))
     mcqs = cv2.resize(mcqs, (800, 1000))
     stNumber = cv2.resize(stNumber, (400, 500))
     task = cv2.resize(task, (400, 500))
     print(sNum)
     print(taskNumber)
+    print(', '.join(answers))
     cv2.imshow('cropped', cropped)
     # cv2.imshow('studentNumber', stNumber)
     # cv2.imshow('task', task)
