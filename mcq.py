@@ -325,6 +325,12 @@ def threeColumnCheck(img):
     return False
 
 
+def writeToFile(studentNumber, taskNumber, answers, filename):
+    f = open(f'CSV/{filename}.csv', 'w')
+    f.write(f'{studentNumber}, {taskNumber}, ')
+    f.write(', '.join(answers))
+
+
 for f in os.listdir('Sheets/2018'):
     sheet = cv2.imread(f'Sheets/2018/{f}', 1)
     cropped = cropAndCorrect(sheet)
@@ -339,6 +345,9 @@ for f in os.listdir('Sheets/2018'):
         answers = getAnswers(groupsThreeColumn(mcqs))
     else:
         answers = getAnswers(groupsTwoColumn(mcqs))
+
+    filename = f[:-4]
+    writeToFile(sNum, taskNumber, answers, filename)
     cropped = cv2.resize(cropped, (800, 1000))
     mcqs = cv2.resize(mcqs, (800, 1000))
     stNumber = cv2.resize(stNumber, (400, 500))
@@ -346,12 +355,12 @@ for f in os.listdir('Sheets/2018'):
     print(sNum)
     print(taskNumber)
     print(', '.join(answers))
-    cv2.imshow('cropped', cropped)
+    #cv2.imshow('cropped', cropped)
     # cv2.imshow('studentNumber', stNumber)
     # cv2.imshow('task', task)
-    cv2.imshow('mcq', mcqs)
-    k = cv2.waitKey(0)
-    if k == ord('q'):
-        break
-    cv2.destroyAllWindows()
+    #cv2.imshow('mcq', mcqs)
+    #k = cv2.waitKey(0)
+    # if k == ord('q'):
+    #    break
+    # cv2.destroyAllWindows()
 cv2.destroyAllWindows()
