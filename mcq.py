@@ -102,8 +102,10 @@ def check180(img):
     cv2.imshow('lowleft', lowLeft)
 
 
-def cropAndCorrect(img):
-    sheet = img[1050:, :]
+def cropAndCorrect(img, crop=False):
+    sheet = img
+    if crop:
+        sheet = img[1050:, :]
     gray = cv2.cvtColor(sheet, cv2.COLOR_BGR2GRAY)
     corners = getCorners(gray)
     rotated = correctAngle(gray, corners[0], corners[2])
@@ -264,7 +266,8 @@ def getAnswers(groups):
         rows, cols = group.shape
         group = group[int(rows / 6): int(rows / 1.1), :]
         rows, cols = group.shape
-        questions = [group[int(20 + (rows * ((i - 1) / 5)))                           :int(rows * ((i) / 5)), :] for i in range(1, 6)]
+        questions = [group[int(20 + (rows * ((i - 1) / 5)))
+                               :int(rows * ((i) / 5)), :] for i in range(1, 6)]
         cv2.imshow(f'group', group)
         for j, question in enumerate(questions):
             rows, cols = question.shape
@@ -282,12 +285,14 @@ def groupsTwoColumn(mcq):
     column1 = mcq[:, int(cols / 6):int(cols / 2.5)]
     column2 = mcq[:, int(cols / 1.58):int(cols / 1.17)]
 
-    #cv2.imshow('column1', cv2.resize(column1, (400, 1000)))
-    #cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
+    # cv2.imshow('column1', cv2.resize(column1, (400, 1000)))
+    # cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
 
     rows, cols = column1.shape
-    groups1 = [column1[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups2 = [column2[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1 = [column1[int(rows * ((i - 1) / 6))
+                           :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6))
+                           :int(rows * ((i) / 6)), :] for i in range(1, 7)]
     groups1.extend(groups2)
     return groups1
 
@@ -302,9 +307,9 @@ def groupsThreeColumn(mcq):
     cv2.imshow('column3', cv2.resize(column3, (400, 1000)))
 
     rows, cols = column1.shape
-    groups1 = [column1[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups2 = [column2[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups3 = [column3[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1 = [column1[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups3 = [column3[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
     groups1.extend(groups2)
     groups1.extend(groups3)
     return groups1
@@ -327,40 +332,61 @@ def threeColumnCheck(img):
 
 def writeToFile(studentNumber, taskNumber, answers, filename):
     f = open(f'CSV/{filename}.csv', 'w')
-    f.write(f'{studentNumber}, {taskNumber}, ')
-    f.write(', '.join(answers))
+    f.write(f'{studentNumber},{taskNumber},')
+    f.write(','.join(answers))
 
 
-for f in os.listdir('Sheets/2018'):
-    sheet = cv2.imread(f'Sheets/2018/{f}', 1)
-    cropped = cropAndCorrect(sheet)
-    mcqs = multipleChoice(cropped)
-    stNumber = studentNumber(cropped)
-    task = taskFromStudentNumber(stNumber)
-    stNumber = removeTaskFromStudentNumber(stNumber)
-    taskNumber = getTaskNumber(task)
-    sNum = getStudentNumber(stNumber)
-    answers = None
-    if threeColumnCheck(cropped):
-        answers = getAnswers(groupsThreeColumn(mcqs))
-    else:
-        answers = getAnswers(groupsTwoColumn(mcqs))
+def doAllTheThings(dataset):
+    for f in os.listdir(f'Sheets/{dataset}'):
+        sheet = cv2.imread(f'Sheets/{dataset}/{f}', 1)
+        cropped = cropAndCorrect(sheet)
+        mcqs = multipleChoice(cropped)
+        stNumber = studentNumber(cropped)
+        task = taskFromStudentNumber(stNumber)
+        stNumber = removeTaskFromStudentNumber(stNumber)
+        taskNumber = getTaskNumber(task)
+        sNum = getStudentNumber(stNumber)
+        answers = None
+        if threeColumnCheck(cropped):
+            answers = getAnswers(groupsThreeColumn(mcqs))
+        else:
+            answers = getAnswers(groupsTwoColumn(mcqs))
 
-    filename = f[:-4]
-    writeToFile(sNum, taskNumber, answers, filename)
-    cropped = cv2.resize(cropped, (800, 1000))
-    mcqs = cv2.resize(mcqs, (800, 1000))
-    stNumber = cv2.resize(stNumber, (400, 500))
-    task = cv2.resize(task, (400, 500))
-    print(sNum)
-    print(taskNumber)
-    print(', '.join(answers))
-    #cv2.imshow('cropped', cropped)
-    # cv2.imshow('studentNumber', stNumber)
-    # cv2.imshow('task', task)
-    #cv2.imshow('mcq', mcqs)
-    #k = cv2.waitKey(0)
-    # if k == ord('q'):
-    #    break
-    # cv2.destroyAllWindows()
-cv2.destroyAllWindows()
+        filename = f[:-4]
+        writeToFile(sNum, taskNumber, answers, filename)
+        cropped = cv2.resize(cropped, (800, 1000))
+        mcqs = cv2.resize(mcqs, (800, 1000))
+        stNumber = cv2.resize(stNumber, (400, 500))
+        task = cv2.resize(task, (400, 500))
+        print(sNum)
+        print(taskNumber)
+        print(','.join(answers))
+        cv2.imshow('cropped', cropped)
+        cv2.imshow('studentNumber', stNumber)
+        cv2.imshow('task', task)
+        cv2.imshow('mcq', mcqs)
+        k = cv2.waitKey(0)
+        if k == ord('q'):
+            break
+        cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
+
+
+doAllTheThings('600dpi')
+# for f in os.listdir('Sheets/600dpi'):
+#sheet = cv2.imread(f'Sheets/600dpi/{f}', 1)
+#gray = cv2.cvtColor(sheet, cv2.COLOR_BGR2GRAY)
+#corners = getCorners(sheet, drawImage=sheet)
+#rotated = correctAngle(sheet, corners[0], corners[2])
+#cropped = getImportant(rotated, corners)
+#checked = check180(cropped)
+#correct = cropAndCorrect(sheet)
+#cv2.imshow('gray', cv2.resize(gray, (500, 1000)))
+#cv2.imshow('rotated', cv2.resize(rotated, (500, 1000)))
+#cv2.imshow('cropped', cv2.resize(cropped, (500, 1000)))
+#cv2.imshow('checked', cv2.resize(checked, (500, 1000)))
+#cv2.imshow('correct', cv2.resize(correct, (500, 1000)))
+#k = cv2.waitKey(0)
+# if k == ord('q'):
+#    break
+# cv2.destroyAllWindows()
