@@ -275,7 +275,6 @@ def getAnswers(groups):
             answers = outList(
                 getNumber(question, horizontal=True, max=5, multiple=True))
             ret.append(answers)
-            print(answers)
             # cv2.waitKey(0)
     return ret
 
@@ -330,14 +329,16 @@ def threeColumnCheck(img):
     return False
 
 
-def writeToFile(studentNumber, taskNumber, answers, filename):
-    f = open(f'CSV/{filename}.csv', 'w')
+def writeToFile(studentNumber, taskNumber, answers, folder, filename):
+    if not os.path.isdir(f'CSV/{folder}'):
+        os.mkdir(f'CSV/{folder}')
+    f = open(f'CSV/{folder}/{filename}.csv', 'w')
     f.write(f'{studentNumber},{taskNumber},')
     f.write(','.join(answers))
 
 
 def doAllTheThings(dataset):
-    for f in os.listdir(f'Sheets/{dataset}'):
+    for f in sorted(os.listdir(f'Sheets/{dataset}'), key=lambda i: i[6:10]):
         sheet = cv2.imread(f'Sheets/{dataset}/{f}', 1)
         cropped = cropAndCorrect(sheet)
         mcqs = multipleChoice(cropped)
@@ -353,7 +354,7 @@ def doAllTheThings(dataset):
             answers = getAnswers(groupsTwoColumn(mcqs))
 
         filename = f[:-4]
-        writeToFile(sNum, taskNumber, answers, filename)
+        writeToFile(sNum, taskNumber, answers, dataset, filename)
         cropped = cv2.resize(cropped, (800, 1000))
         mcqs = cv2.resize(mcqs, (800, 1000))
         stNumber = cv2.resize(stNumber, (400, 500))
@@ -361,32 +362,17 @@ def doAllTheThings(dataset):
         print(sNum)
         print(taskNumber)
         print(','.join(answers))
+        print(filename, end='\n\n')
         cv2.imshow('cropped', cropped)
         cv2.imshow('studentNumber', stNumber)
         cv2.imshow('task', task)
         cv2.imshow('mcq', mcqs)
-        k = cv2.waitKey(0)
-        if k == ord('q'):
-            break
+        #k = cv2.waitKey(0)
+        # if k == ord('q'):
+        #    break
         cv2.destroyAllWindows()
     cv2.destroyAllWindows()
 
 
+doAllTheThings('2018')
 doAllTheThings('600dpi')
-# for f in os.listdir('Sheets/600dpi'):
-#sheet = cv2.imread(f'Sheets/600dpi/{f}', 1)
-#gray = cv2.cvtColor(sheet, cv2.COLOR_BGR2GRAY)
-#corners = getCorners(sheet, drawImage=sheet)
-#rotated = correctAngle(sheet, corners[0], corners[2])
-#cropped = getImportant(rotated, corners)
-#checked = check180(cropped)
-#correct = cropAndCorrect(sheet)
-#cv2.imshow('gray', cv2.resize(gray, (500, 1000)))
-#cv2.imshow('rotated', cv2.resize(rotated, (500, 1000)))
-#cv2.imshow('cropped', cv2.resize(cropped, (500, 1000)))
-#cv2.imshow('checked', cv2.resize(checked, (500, 1000)))
-#cv2.imshow('correct', cv2.resize(correct, (500, 1000)))
-#k = cv2.waitKey(0)
-# if k == ord('q'):
-#    break
-# cv2.destroyAllWindows()
