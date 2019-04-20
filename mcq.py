@@ -108,15 +108,23 @@ def correctAngle(img, p1, p2):
 
 def check180(img):
     rows, cols = img.shape
-    lowLeft = img[int(rows / 1.04):, :int(cols / 19.5)].copy()
+    lowLeft = img[int(rows / 1.025):int(rows / 1.01), :int(cols / 6)].copy()
+    roi = img[int(rows / 1.04):, :int(cols / 19.5)]
+    _, roi = cv2.threshold(roi, 255, 255, cv2.THRESH_BINARY)
+    img[int(rows / 1.04):, :int(cols / 19.5)] = roi
     _, lowLeft = cv2.threshold(
         lowLeft, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    kernel = np.ones((3, 3), np.uint8)
+    lowLeft = cv2.morphologyEx(lowLeft, cv2.MORPH_ERODE,
+                               kernel, iterations=3)
     rows, cols = lowLeft.shape
     nPixels = rows * cols
-    if cv2.countNonZero(lowLeft) > nPixels * 0.90:
+    if cv2.countNonZero(lowLeft) > nPixels * 0.80:
         img = rotateImage(img, 180)
-    return img
     cv2.imshow('lowleft', lowLeft)
+    cv2.imshow('i', cv2.resize(img, (500, 500)))
+    cv2.waitKey(0)
+    return img
 
 
 def cropAndCorrect(img, crop=False):
@@ -400,6 +408,7 @@ def doAllTheThings(dataset):
         cv2.imshow('studentNumber', studentNumber)
         cv2.imshow('task', task)
         cv2.imshow('mcq', mcqs)
+        cv2.waitKey(0)
         #k = cv2.waitKey(0)
         # if k == ord('q'):
         #    break
