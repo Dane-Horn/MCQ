@@ -3,9 +3,9 @@ import cv2
 from math import atan2
 import math
 import os
+
+
 # from sys import argv
-
-
 def rotateImage(image, angle):
     image_center = tuple(np.array(image.shape[1::-1]) / 2)
     rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1)
@@ -14,6 +14,7 @@ def rotateImage(image, angle):
     return result
 
 
+# draw smallest minimum enclosing circles around contours
 def drawMinEnclose(resized, circles):
     (x, y), radius = cv2.minEnclosingCircle(circles)
     center = (int(x), int(y))
@@ -21,6 +22,7 @@ def drawMinEnclose(resized, circles):
     cv2.circle(resized, center, radius, (0, 255, 0), 2)
 
 
+# get corners of inner mcq sheet
 def getCorners(image, drawImage=None):  # TODO
     def intCircle(circle):
         return (int(circle[0]), int(circle[1]))
@@ -30,25 +32,37 @@ def getCorners(image, drawImage=None):  # TODO
     _, thresh = cv2.threshold(
         blur, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     kernel = np.ones((3, 3), np.uint8)
+
+    # close to get rid of as many white spots in the middle of a circle as possible
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE,
                                kernel, iterations=9)
+    # erode to make black shapes as large as possible
     eroding = cv2.morphologyEx(closing, cv2.MORPH_ERODE,
                                kernel, iterations=15)
-    # cv2.imshow('eroded', cv2.resize(eroding, (800, 1000)))
+
     contours, _ = cv2.findContours(
         eroding, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     circleArr = []
     for circles in contours:
         area = cv2.contourArea(circles)
+        # filter contours
         if area < 200 or area > 50000:
             continue
 
         if len(circles) < 5:
             continue
+
         (x, y), _ = cv2.minEnclosingCircle(circles)
+        # draw circles on drawImage if arg is set
         if type(drawImage) != None:
             drawMinEnclose(drawImage, circles)
         circleArr.append((x, y))
+
+    # sort and extract corners based on extreme values
+    # top left - lowest x, y combination
+    # top right - highest x with lowest y combination
+    # bottom left - lowest x with highest y combination
+    # bottom right - highest x y combination
     xSorted = sorted(circleArr, key=lambda x: x[0])
 
     leftCircles = sorted(xSorted[:2], key=lambda x: x[1])
@@ -60,6 +74,7 @@ def getCorners(image, drawImage=None):  # TODO
     return (topLeft, bottomLeft, topRight, bottomRight)
 
 
+# crops out mcq sheet based on corners found
 def getImportant(image, corners, expand=0):
     topLeft, bottomLeft, topRight, bottomRight = corners
     left_right = math.sqrt(
@@ -80,6 +95,8 @@ def getImportant(image, corners, expand=0):
     return img
 
 
+# corrects angle using the angle between two points; either the top left and top right corners
+# or the bottom left and bottom right corners
 def correctAngle(img, p1, p2):
     angle = atan2(p2[1]-p1[1], p2[0]-p1[0])
     angle = math.degrees(angle)
@@ -115,21 +132,25 @@ def cropAndCorrect(img, crop=False):
     return cropped
 
 
-def multipleChoice(img):
+# get question part of inner sheet
+def multipleChoiceRegion(img):
     rows, cols = img.shape
     return img[:int(rows/1.028), int(cols/3.2):].copy()
 
 
-def studentNumber(img):
+# get student number part of inner sheet
+def studentNumberRegion(img):
     rows, cols = img.shape
     return img[int(rows / 7.5):int(rows / 1.17), int(cols / 29): int(cols / 3.45)].copy()
 
 
+# get task number part from student number part
 def taskFromStudentNumber(stNumber):
     rows, cols = stNumber.shape
     return stNumber[int(rows / 2.1):int(rows / 1.16), int(cols / 1.45):int(cols / 1.05)].copy()
 
 
+# clean the task number from the student number region, just to keep it clean
 def removeTaskFromStudentNumber(stNumber):
     ret = stNumber.copy()
     rows, cols = stNumber.shape
@@ -137,6 +158,12 @@ def removeTaskFromStudentNumber(stNumber):
     return ret
 
 
+# general method to get the nth (0 to max-1) circle filled in given the circles to look at
+# optional arguments:
+# max - the number of circles in the picture
+# display - display partial processing as images are generated
+# horizontal - changes the number to pass through column-wise rather than the default row-wise
+# multiple - return an array of values found instead of the last value found
 def getNumber(img, max=10, display=False, horizontal=False, multiple=False):
     _, thresh = cv2.threshold(
         img, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -201,6 +228,7 @@ def outList(arr):
         return ''.join(arr)
 
 
+# gets the task number using the task number region and the getNumber function
 def getTaskNumber(task):
     _, cols = task.shape
     column1 = task[:, :int(cols/2.2)].copy()
@@ -210,6 +238,7 @@ def getTaskNumber(task):
     return f'{outNumber(tens)}{outNumber(unit)}'
 
 
+# gets the student number using the student number region and the getNumber function
 def getStudentNumber(stNumber):
     rows, cols = stNumber.shape
     year1 = stNumber[
@@ -260,14 +289,14 @@ def getStudentNumber(stNumber):
     return f'{outNumber(y1)}{outNumber(y2)}{numberToLetter(l)}{outNumber(d1)}{outNumber(d2)}{outNumber(d3)}{outNumber(d4)}'
 
 
+# gets answers using the mcq region and the getNumber function
 def getAnswers(groups):
     ret = []
     for i, group in enumerate(groups):
         rows, cols = group.shape
         group = group[int(rows / 6): int(rows / 1.1), :]
         rows, cols = group.shape
-        questions = [group[int(20 + (rows * ((i - 1) / 5)))
-                               :int(rows * ((i) / 5)), :] for i in range(1, 6)]
+        questions = [group[int(20 + (rows * ((i - 1) / 5)))                           :int(rows * ((i) / 5)), :] for i in range(1, 6)]
         cv2.imshow(f'group', group)
         for j, question in enumerate(questions):
             rows, cols = question.shape
@@ -279,6 +308,7 @@ def getAnswers(groups):
     return ret
 
 
+# gets mcq groups of 5 questions for sheets with two columns
 def groupsTwoColumn(mcq):
     rows, cols = mcq.shape
     column1 = mcq[:, int(cols / 6):int(cols / 2.5)]
@@ -288,14 +318,13 @@ def groupsTwoColumn(mcq):
     # cv2.imshow('column2', cv2.resize(column2, (400, 1000)))
 
     rows, cols = column1.shape
-    groups1 = [column1[int(rows * ((i - 1) / 6))
-                           :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups2 = [column2[int(rows * ((i - 1) / 6))
-                           :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1 = [column1[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
     groups1.extend(groups2)
     return groups1
 
 
+# gets mcq groups of 5 questions for sheets with three columns
 def groupsThreeColumn(mcq):
     rows, cols = mcq.shape
     column1 = mcq[:, int(cols / 13):int(cols / 3.5)]
@@ -306,14 +335,15 @@ def groupsThreeColumn(mcq):
     cv2.imshow('column3', cv2.resize(column3, (400, 1000)))
 
     rows, cols = column1.shape
-    groups1 = [column1[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups2 = [column2[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
-    groups3 = [column3[int(rows * ((i - 1) / 6))                       :int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups1 = [column1[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups2 = [column2[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
+    groups3 = [column3[int(rows * ((i - 1) / 6)):int(rows * ((i) / 6)), :] for i in range(1, 7)]
     groups1.extend(groups2)
     groups1.extend(groups3)
     return groups1
 
 
+# checks if a sheet has 3 columns
 def threeColumnCheck(img):
     rows, cols = img.shape
     check = img[int(rows/2):int(rows/1.2), int(cols/3.15):int(cols/3)]
@@ -329,6 +359,8 @@ def threeColumnCheck(img):
     return False
 
 
+# write the student number, task number and answers for each sheet into a csv file
+# each sheet is a single line
 def writeToFile(studentNumber, taskNumber, answers, folder, filename):
     if not os.path.isdir(f'CSV/{folder}'):
         os.mkdir(f'CSV/{folder}')
@@ -337,16 +369,17 @@ def writeToFile(studentNumber, taskNumber, answers, folder, filename):
     f.write(','.join(answers))
 
 
+# does what it says
 def doAllTheThings(dataset):
     for f in sorted(os.listdir(f'Sheets/{dataset}'), key=lambda i: i[6:10]):
         sheet = cv2.imread(f'Sheets/{dataset}/{f}', 1)
         cropped = cropAndCorrect(sheet)
-        mcqs = multipleChoice(cropped)
-        stNumber = studentNumber(cropped)
-        task = taskFromStudentNumber(stNumber)
-        stNumber = removeTaskFromStudentNumber(stNumber)
+        mcqs = multipleChoiceRegion(cropped)
+        studentNumber = studentNumberRegion(cropped)
+        task = taskFromStudentNumber(studentNumber)
+        studentNumber = removeTaskFromStudentNumber(studentNumber)
         taskNumber = getTaskNumber(task)
-        sNum = getStudentNumber(stNumber)
+        sNum = getStudentNumber(studentNumber)
         answers = None
         if threeColumnCheck(cropped):
             answers = getAnswers(groupsThreeColumn(mcqs))
@@ -357,14 +390,14 @@ def doAllTheThings(dataset):
         writeToFile(sNum, taskNumber, answers, dataset, filename)
         cropped = cv2.resize(cropped, (800, 1000))
         mcqs = cv2.resize(mcqs, (800, 1000))
-        stNumber = cv2.resize(stNumber, (400, 500))
+        studentNumber = cv2.resize(studentNumber, (400, 500))
         task = cv2.resize(task, (400, 500))
         print(sNum)
         print(taskNumber)
         print(','.join(answers))
         print(filename, end='\n\n')
         cv2.imshow('cropped', cropped)
-        cv2.imshow('studentNumber', stNumber)
+        cv2.imshow('studentNumber', studentNumber)
         cv2.imshow('task', task)
         cv2.imshow('mcq', mcqs)
         #k = cv2.waitKey(0)
